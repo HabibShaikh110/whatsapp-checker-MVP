@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>WhatsApp Checker</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+  
+      body {
+        margin: 0;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f4f4f4;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+  
+      .navbar {
+        background-color: #25d366;
+        padding: 15px 30px;
+        color: white;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+  
+      .navbar .logo {
+        font-size: 20px;
+        font-weight: bold;
+      }
+  
+      .navbar a {
+        color: white;
+        text-decoration: none;
+        font-size: 14px;
+      }
+  
+      .wrapper {
+        flex: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 40px 20px;
+      }
+  
+      .main {
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        width: 100%;
+        max-width: 420px;
+      }
+  
+      .main h1 {
+        color: #25d366;
+        text-align: center;
+        margin-bottom: 10px;
+      }
+  
+      .main h2 {
+        color: #555;
+        text-align: center;
+        font-size: 14px;
+        margin-bottom: 30px;
+      }
+  
+      .main h3 {
+        margin-bottom: 15px;
+        color: #333;
+        font-size: 18px;
+      }
+  
+      input#numberInput {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        font-size: 16px;
+      }
+  
+      button {
+        width: 100%;
+        padding: 12px;
+        background-color: #25d366;
+        border: none;
+        color: white;
+        font-size: 16px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+      }
+  
+      button:hover {
+        background-color: #1ebe5d;
+      }
+  
+      #checkingStatus {
+        margin-top: 15px;
+        color: #ff9900;
+        font-weight: 500;
+      }
+  
+      #results {
+        margin-top: 15px;
+        padding: 12px;
+        border-radius: 6px;
+        background-color: #f0f0f0;
+        color: #333;
+      }
+  
+      .footer {
+        background-color: #fafafa;
+        text-align: center;
+        padding: 15px;
+        font-size: 14px;
+        color: #777;
+      }
+    </style>
+  </head>
+  <body>
+  
+    <!-- Navbar -->
+    <div class="navbar">
+      <div class="logo">WhatsValid</div>
+      <a href="https://wa.bnbcloudservices.com">← Back to Main Site</a>
+    </div>
+  
+    <!-- Content -->
+    <div class="wrapper">
+      <div class="main">
+        <h1>📱 WhatsApp Checker</h1>
+        <h2>Fast & Simple - Just Enter the Number</h2>
+  
+        <h3>✅ Enter WhatsApp Number</h3>
+        <input
+          id="numberInput"
+          placeholder="Like 92333XXXXXXX"
+        />
+        <button onclick="checkSingle()">Check Now</button>
+  
+        <div id="checkingStatus" style="display: none;">
+          ⏳ Checking Number...
+        </div>
+  
+        <div id="results"></div>
+      </div>
+    </div>
+  
+    <!-- Footer -->
+    <div class="footer">
+      © 2025 HUR Digital Creations — All rights reserved.
+    </div>
+
+    <script>
+      async function pollStatus() {
+        const statusRes = await fetch("/status");
+        const { connectionStatus } = await statusRes.json();
+        const statusEl = document.getElementById("status");
+        const qrBox = document.getElementById("qrBox");
+        const qrImg = document.getElementById("qrImage");
+
+        if (connectionStatus === "connected") {
+          statusEl.innerText = "✅ WhatsApp is Connected!";
+          qrBox.style.display = "none";
+        } else if (connectionStatus === "disconnected") {
+          statusEl.innerText = "❌ Not connected. Scan QR below to connect:";
+          const qrRes = await fetch("/qr");
+          if (qrRes.status === 200) {
+            const { qr } = await qrRes.json();
+            qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(
+              qr
+            )}&size=200x200`;
+            qrBox.style.display = "block";
+          }
+        } else {
+          statusEl.innerText = "🔄 Loading...";
+        }
+      }
+
+      setInterval(pollStatus, 3000);
+      pollStatus();
+
+      async function checkSingle() {
+        document.getElementById("checkingStatus").style.display = "block";
+        const number = document.getElementById("numberInput").value;
+        const res = await fetch("/check", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ number }),
+        });
+        const data = await res.json();
+        document.getElementById("results").innerText = data.exists
+          ? `✅ ${data.number} is on WhatsApp`
+          : `❌ ${data.number} is NOT on WhatsApp`;
+        document.getElementById("checkingStatus").style.display = "none";
+      }
+      
+    </script>
+  </body>
+</html>
