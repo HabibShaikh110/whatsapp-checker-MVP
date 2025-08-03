@@ -156,33 +156,38 @@
     </div>
 
     <script>
-      // async function pollStatus() {
-      //   const statusRes = await fetch("/status");
-      //   const { connectionStatus } = await statusRes.json();
-      //   const statusEl = document.getElementById("status");
-      //   const qrBox = document.getElementById("qrBox");
-      //   const qrImg = document.getElementById("qrImage");
+      async function pollStatus() {
+        const statusRes = await fetch("/status");
+        const { connectionStatus } = await statusRes.json();
+        const statusEl = document.getElementById("status");
+        const qrBox = document.getElementById("qrBox");
+        const qrImg = document.getElementById("qrImage");
 
-      //   if (connectionStatus === "connected") {
-      //     statusEl.innerText = "✅ WhatsApp is Connected!";
-      //     qrBox.style.display = "none";
-      //   } else if (connectionStatus === "disconnected") {
-      //     statusEl.innerText = "❌ Not connected. Scan QR below to connect:";
-      //     const qrRes = await fetch("/qr");
-      //     if (qrRes.status === 200) {
-      //       const { qr } = await qrRes.json();
-      //       qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(
-      //         qr
-      //       )}&size=200x200`;
-      //       qrBox.style.display = "block";
-      //     }
-      //   } else {
-      //     statusEl.innerText = "🔄 Loading...";
-      //   }
-      // }
+        if (connectionStatus === "connected") {
+          statusEl.innerText = "✅ WhatsApp is Connected!";
+          qrBox.style.display = "none";
+        } else if (connectionStatus === "disconnected") {
+          statusEl.innerText = "❌ Not connected. Scan QR below to connect:";
+          const qrRes = await fetch("/qr");
+          if (qrRes.status === 200) {
+            const { qr } = await qrRes.json();
+            qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(
+              qr
+            )}&size=200x200`;
+            qrBox.style.display = "block";
+          }
+        } else {
+          statusEl.innerText = "🔄 Loading...";
+        }
+      }
+      if (response.status === 429) {
+  alert("Too many checks! Please wait a minute.");
+  return;
+}
 
-      // setInterval(pollStatus, 3000);
-      // pollStatus();
+
+      setInterval(pollStatus, 3000);
+      pollStatus();
 
       async function checkSingle() {
         document.getElementById("checkingStatus").style.display = "block";
