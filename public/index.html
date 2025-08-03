@@ -194,7 +194,7 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ number }),
         });
-        if (response.status === 429) {
+        if (res.status === 429) {
   alert("⚠️ Too many requests! Please wait 1 minute before trying again.");
   return;
 }
