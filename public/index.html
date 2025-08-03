@@ -180,15 +180,15 @@
           statusEl.innerText = "🔄 Loading...";
         }
       }
-      if (response.status === 429) {
-  alert("Too many checks! Please wait a minute.");
-  return;
-}
+  
 
 
       setInterval(pollStatus, 3000);
       pollStatus();
-
+      if (response.status === 429) {
+  alert("Too many checks! Please wait a minute.");
+  return;
+}
       async function checkSingle() {
         document.getElementById("checkingStatus").style.display = "block";
         const number = document.getElementById("numberInput").value;
@@ -203,6 +203,7 @@
           : `❌ ${data.number} is NOT on WhatsApp`;
         document.getElementById("checkingStatus").style.display = "none";
       }
+
       
     </script>
   </body>
