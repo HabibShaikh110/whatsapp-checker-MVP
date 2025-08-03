@@ -187,10 +187,6 @@
       // pollStatus();
     
       async function checkSingle() {
-        if (response.status === 429) {
-  alert("Too many checks! Please wait a minute.");
-  return;
-}
         document.getElementById("checkingStatus").style.display = "block";
         const number = document.getElementById("numberInput").value;
         const res = await fetch("/check", {
