@@ -1,13 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WhatsApp Checker</title>
     <style>
-      * {
+       * {
         box-sizing: border-box;
       }
-  
+
       body {
         margin: 0;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -15,8 +16,9 @@
         display: flex;
         flex-direction: column;
         min-height: 100vh;
+        align-items: center;
       }
-  
+
       .navbar {
         background-color: #25d366;
         padding: 15px 30px;
@@ -24,196 +26,162 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
+        width: 100%;
       }
-  
+
       .navbar .logo {
         font-size: 20px;
         font-weight: bold;
       }
-  
+
       .navbar a {
         color: white;
         text-decoration: none;
         font-size: 14px;
       }
-      .nav-switch {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-}
 
-  
-      .wrapper {
-        flex: 1;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        padding: 40px 20px;
+      h3 {
+        text-align: center;
+        margin-bottom: 20px;
       }
-  
-      .main {
+      
+
+      #bulkForm {
         background: white;
+        margin-top: 60px;
         padding: 30px;
-        border-radius: 12px;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
-        width: 100%;
-        max-width: 420px;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+        width: 90%;
+        max-width: 600px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
       }
-  
-      .main h1 {
-        color: #25d366;
-        text-align: center;
-        margin-bottom: 10px;
-      }
-  
-      .main h2 {
-        color: #555;
-        text-align: center;
+
+      input[type='file'] {
+        margin-bottom: 20px;
         font-size: 14px;
-        margin-bottom: 30px;
       }
-  
-      .main h3 {
-        margin-bottom: 15px;
-        color: #333;
-        font-size: 18px;
-      }
-  
-      input#numberInput {
-        width: 100%;
-        padding: 12px;
-        border: 1px solid #ccc;
-        border-radius: 8px;
-        margin-bottom: 15px;
-        font-size: 16px;
-      }
-  
-      button {
-        width: 100%;
-        padding: 12px;
+
+      #bulkForm button {
+        padding: 10px 18px;
         background-color: #25d366;
-        border: none;
         color: white;
-        font-size: 16px;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: background-color 0.3s ease;
-      }
-  
-      button:hover {
-        background-color: #1ebe5d;
-      }
-  
-      #checkingStatus {
-        margin-top: 15px;
-        color: #ff9900;
-        font-weight: 500;
-      }
-  
-      #results {
-        margin-top: 15px;
-        padding: 12px;
+        border: none;
         border-radius: 6px;
-        background-color: #f0f0f0;
-        color: #333;
+        font-weight: bold;
+        cursor: pointer;
       }
-  
+
+      #bulkForm button:hover {
+        background-color: #1db954;
+      }
+
+      #checkingBulkStatus {
+        margin-top: 15px;
+        font-size: 14px;
+      }
+
+      #bulk-result-section {
+        margin-top: 40px;
+        width: 90%;
+        max-width: 700px;
+        text-align: center;
+      }
+
+      #result-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0;
+        font-size: 16px;
+        border: 1px solid #ccc;
+        box-shadow: 0 0 5px rgba(0, 0, 0, 0.05);
+      }
+
+      #result-table th,
+      #result-table td {
+        border: 1px solid #ddd;
+        padding: 10px 12px;
+        text-align: center;
+      }
+
+      #result-table th {
+        background-color: #f4f4f4;
+        font-weight: 600;
+      }
+
+      #result-table tr:nth-child(even) {
+        background-color: #fafafa;
+      }
+
+      #result-table tr:hover {
+        background-color: #f1f7ff;
+      }
+
+      #bulk-result-section button {
+        margin-top: 10px;
+        padding: 10px 16px;
+        background-color: royalblue;
+        color: white;
+        border: none;
+        cursor: pointer;
+        border-radius: 6px;
+        font-weight: bold;
+      }
+
+      #bulk-result-section button:hover {
+        background-color: #2b5cb8;
+      }
+
       .footer {
         background-color: #fafafa;
         text-align: center;
         padding: 15px;
         font-size: 14px;
         color: #777;
+        margin-top: auto;
+        width: 100%;
       }
     </style>
-  </head>
-  <body>
-  
-    <!-- Navbar -->
+</head>
+<body>
     <div class="navbar">
-      <div class="logo">WhatsValid</div>
-        <a href="/bulkCheck.html">Switch to Bulk Check</a>
-      <a href="https://wa.bnbcloudservices.com">← Back to Main Site</a>
-    </div>
-  
-    <!-- Content -->
-    <div class="wrapper">
-      <div class="main">
-        <h1>📱 WhatsApp Checker</h1>
-        <h2>Fast & Simple - Just Enter the Number</h2>
-  
-        <h3>✅ Enter WhatsApp Number</h3>
-      
-        <input
-          id="numberInput"
-          placeholder="Like 92333XXXXXXX"
-        />
-        <button onclick="checkSingle()">Check Now</button>
-  
-        <div id="checkingStatus" style="display: none;">
-          ⏳ Checking Number...
+        <div class="logo">WhatsValid</div>
+          <a href="/index.html">Switch to Single Check</a>
+        <a href="https://wa.bnbcloudservices.com">← Back to Main Site</a>
+      </div>
+
+    <form id="bulkForm">
+        <h3>📂 Bulk Check (.txt or .csv)</h3>
+        <input type="file" id="fileInput" />
+        <button type="submit">Upload</button>
+        <div id="checkingBulkStatus" style="display: none">
+          ⏳Checking Numbers...
         </div>
-  
-        <div id="results"></div>
+        <div id="bulkResults"></div>
+      </form>
+      <!-- Result Table -->
+      <div id="bulk-result-section" style="display: none; margin-top: 20px">
+        <h3>✅ Bulk Check Results:</h3>
+        <table border="1" id="result-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Phone Number</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <button onclick="downloadExcel()">⬇️ Download Excel</button>
       </div>
     </div>
-  
-    <!-- Footer -->
     <div class="footer">
-      © 2025 HUR Digital Creations — All rights reserved.
+      <p>Powererd By Testing Item</p>
     </div>
-
     <script>
-      // async function pollStatus() {
-      //   const statusRes = await fetch("/status");
-      //   const { connectionStatus } = await statusRes.json();
-      //   const statusEl = document.getElementById("status");
-      //   const qrBox = document.getElementById("qrBox");
-      //   const qrImg = document.getElementById("qrImage");
-
-      //   if (connectionStatus === "connected") {
-      //     statusEl.innerText = "✅ WhatsApp is Connected!";
-      //     qrBox.style.display = "none";
-      //   } else if (connectionStatus === "disconnected") {
-      //     statusEl.innerText = "❌ Not connected. Scan QR below to connect:";
-      //     const qrRes = await fetch("/qr");
-      //     if (qrRes.status === 200) {
-      //       const { qr } = await qrRes.json();
-      //       qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(
-      //         qr
-      //       )}&size=200x200`;
-      //       qrBox.style.display = "block";
-      //     }
-      //   } else {
-      //     statusEl.innerText = "🔄 Loading...";
-      //   }
-      // }
-  
-
-
-      // setInterval(pollStatus, 3000);
-      // pollStatus();
-    
-      async function checkSingle() {
-        document.getElementById("checkingStatus").style.display = "block";
-        const number = document.getElementById("numberInput").value;
-        const res = await fetch("/check", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ number }),
-        });
-        if (res.status === 429) {
-  alert("You’ve reached your free usage limit. Please wait 10 minutes before trying again.");
-  return;
-}
-        const data = await res.json();
-        document.getElementById("results").innerText = data.exists
-          ? `✅ ${data.number} is on WhatsApp`
-          : `❌ ${data.number} is NOT on WhatsApp`;
-        document.getElementById("checkingStatus").style.display = "none";
-      }
-
-      document
+        document
         .getElementById("bulkForm").addEventListener("submit", async function (e) {
         e.preventDefault();
           document.getElementById("checkingBulkStatus").style.display = "block";
@@ -307,7 +275,6 @@
         link.click();
         document.body.removeChild(link);
       }
-      
     </script>
-  </body>
+</body>
 </html>

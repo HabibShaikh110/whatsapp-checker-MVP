@@ -1,6 +1,7 @@
 const express = require("express");
 const fs = require("fs");
 const csv = require("csv-parser");
+const multer = require("multer");
 const qrcode = require("qrcode-terminal");
 const SESSION_PATH = './sessions';
 const path = require("path");
@@ -11,6 +12,7 @@ const {makeWASocket,
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const upload = multer({ dest: "uploads/" });
 
 let connectionStatus = "loading";
 let lastQR = null;
@@ -108,6 +110,51 @@ app.post("/check", async (req, res) => {
     res.status(500).json({ error: "Failed to check number" });
   }
 });
+app.post("/upload", upload.single("file"), async (req, res) => {
+  const file = req.file;
+  if (!file) return res.status(400).send({ error: "No file uploaded" });
+
+  let numbers = [];
+
+  if (file.mimetype === "text/plain") {
+    const content = fs.readFileSync(file.path, "utf-8");
+    numbers = content
+      .split("\n")
+      .map((n) => n.trim())
+      .filter(Boolean);
+  } else if (file.mimetype === "text/csv") {
+    const rows = [];
+    fs.createReadStream(file.path)
+      .pipe(csv())
+      .on("data", (data) => rows.push(data))
+      .on("end", async () => {
+        numbers = rows.map((r) => Object.values(r)[0].trim());
+        const results = await checkMany(numbers);
+        fs.unlinkSync(file.path);
+        res.json({ results });
+      });
+    return;
+  } else {
+    return res.status(400).send({ error: "Unsupported file type" });
+  }
+
+  const results = await checkMany(numbers);
+  fs.unlinkSync(file.path);
+  res.json({ results });
+});
+
+async function checkMany(numbers) {
+  const results = [];
+  for (const number of numbers) {
+    try {
+      const result = await sock.onWhatsApp(`${number}@s.whatsapp.net`);
+      results.push({ number, exists: result?.[0]?.exists || false });
+    } catch {
+      results.push({ number, exists: null, error: "Error checking" });
+    }
+  }
+  return results;
+}
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
