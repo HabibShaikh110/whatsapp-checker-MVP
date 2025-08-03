@@ -194,6 +194,10 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ number }),
         });
+        if (response.status === 429) {
+  alert("⚠️ Too many requests! Please wait 1 minute before trying again.");
+  return;
+}
         const data = await res.json();
         document.getElementById("results").innerText = data.exists
           ? `✅ ${data.number} is on WhatsApp`
