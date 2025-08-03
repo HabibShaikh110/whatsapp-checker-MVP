@@ -185,18 +185,21 @@
 
       setInterval(pollStatus, 3000);
       pollStatus();
-      if (response.status === 429) {
-  alert("Too many checks! Please wait a minute.");
-  return;
+   ;
 }
       async function checkSingle() {
+        if (response.status === 429) {
+  alert("Too many checks! Please wait a minute.");
+  return;
         document.getElementById("checkingStatus").style.display = "block";
         const number = document.getElementById("numberInput").value;
         const res = await fetch("/check", {
+          
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ number }),
         });
+
         const data = await res.json();
         document.getElementById("results").innerText = data.exists
           ? `✅ ${data.number} is on WhatsApp`
