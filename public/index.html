@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <link rel="shortcut icon" href="/images/5SSdze-LogoMakr.png" type="image/x-icon">
     <meta charset="UTF-8" />
-    <title>WhatsApp Checker</title>
+    <title>WhatsValid | App</title>
     <style>
       * {
         box-sizing: border-box;
@@ -203,7 +204,7 @@
           body: JSON.stringify({ number }),
         });
         if (res.status === 429) {
-  alert("You’ve reached your free usage limit. Please wait 10 minutes before trying again.");
+  alert("Get full access to bulk checks and higher speed, upgrade to Starter Plan or wait for 10 minutes");
   return;
 }
         const data = await res.json();
