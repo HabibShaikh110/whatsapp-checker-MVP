@@ -140,6 +140,7 @@
     <!-- Content -->
     <div class="wrapper">
       <div class="main">
+        <p id="planName" style="font-weight: bold; margin-bottom: 10px;"></p>
         <h1>📱 WhatsApp Checker</h1>
         <h2>Fast & Simple - Just Enter the Number</h2>
   
@@ -165,6 +166,18 @@
     </div>
 
     <script>
+      // Detect selected plan from URL
+const urlParams = new URLSearchParams(window.location.search);
+const plan = urlParams.get('plan');
+
+// Show plan in UI (for now, just to see it works)
+if (plan) {
+  const planEl = document.getElementById('planName');
+  if (planEl) {
+    planEl.innerText = `🚀 Selected Plan: ${plan.toUpperCase()}`;
+  }
+}
+
       // async function pollStatus() {
       //   const statusRes = await fetch("/status");
       //   const { connectionStatus } = await statusRes.json();
