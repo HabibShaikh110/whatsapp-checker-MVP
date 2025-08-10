@@ -217,7 +217,7 @@ if (plan) {
           body: JSON.stringify({ number }),
         });
         if (res.status === 429) {
-  alert("Get full access to bulk checks and higher speed, upgrade to Starter Plan or wait for 10 minutes");
+  alert("Daily limit reached. Please try again tomorrow or upgrade your plan.");
   return;
 }
         const data = await res.json();
