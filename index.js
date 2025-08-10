@@ -1,233 +1,149 @@
+// index.js
 const express = require("express");
-const fs = require("fs");
-const csv = require("csv-parser");
-const multer = require("multer");
-const qrcode = require("qrcode-terminal");
-const SESSION_PATH = './sessions';
+const bodyParser = require("body-parser");
+const admin = require("firebase-admin");
+const cors = require("cors");
+require("dotenv").config();
 
-const {makeWASocket,
-  fetchLatestBaileysVersion,
-  useMultiFileAuthState,
-} = require("@whiskeysockets/baileys");
+// ===== Firebase Admin Init =====
+const serviceAccount = require("./firebase-key.json"); // your private key file
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+const db = admin.firestore();
 
 const app = express();
+app.use(cors());
+app.use(bodyParser.json());
+
 const PORT = process.env.PORT || 3000;
-const upload = multer({ dest: "uploads/" });
 
-let connectionStatus = "loading";
-let lastQR = null;
-let sock;
-// In-memory daily & monthly usage tracking
-const path = require("path");
-const usageFile = './usage.json';
+// ===== CONFIG =====
+const PLAN_LIMITS = {
+  free: {
+    singleCheckLimitPerDay: 10,
+    bulkCheckLimitPerMonth: 100,
+  },
+  starter: {
+    singleCheckLimitPerDay: Infinity,
+    bulkCheckLimitPerMonth: 10000,
+  },
+  power: {
+    singleCheckLimitPerDay: Infinity,
+    bulkCheckLimitPerMonth: Infinity,
+  },
+};
 
-// Load usage data from file (or init if missing)
-function loadUsage() {
-  if (fs.existsSync(usageFile)) {
-    return JSON.parse(fs.readFileSync(usageFile, 'utf-8'));
+// ===== Helper: Get or Create User Record =====
+async function getUserData(userId) {
+  const userRef = db.collection("users").doc(userId);
+  const docSnap = await userRef.get();
+
+  if (!docSnap.exists) {
+    const defaultData = {
+      plan: "free",
+      usage: {
+        singleChecksToday: 0,
+        bulkChecksThisMonth: 0,
+      },
+      lastUpdated: admin.firestore.Timestamp.now(),
+    };
+    await userRef.set(defaultData);
+    return defaultData;
   }
-  return { lastDailyReset: new Date().toISOString().slice(0, 10), lastMonthlyReset: new Date().toISOString().slice(0, 10), users: {} };
+  return docSnap.data();
 }
 
-// Save usage data to file
-function saveUsage(data) {
-  fs.writeFileSync(usageFile, JSON.stringify(data, null, 2));
-}
+// ===== Helper: Reset counts if new day/month =====
+function resetIfNewPeriod(userData) {
+  const now = new Date();
+  const lastUpdated = userData.lastUpdated.toDate();
 
-// Reset checks if needed
-function resetIfNeeded() {
-  const today = new Date().toISOString().slice(0, 10);
-  const usage = loadUsage();
-
-  if (usage.lastDailyReset !== today) {
-    for (const ip in usage.users) usage.users[ip].daily = 0;
-    usage.lastDailyReset = today;
-    console.log("✅ Daily check counts reset.");
+  // Daily reset for single checks
+  if (
+    now.getDate() !== lastUpdated.getDate() ||
+    now.getMonth() !== lastUpdated.getMonth() ||
+    now.getFullYear() !== lastUpdated.getFullYear()
+  ) {
+    userData.usage.singleChecksToday = 0;
   }
 
-  const daysSinceMonthly = Math.floor((new Date(today) - new Date(usage.lastMonthlyReset)) / (1000 * 60 * 60 * 24));
-  if (daysSinceMonthly >= 30) {
-    for (const ip in usage.users) usage.users[ip].monthly = 0;
-    usage.lastMonthlyReset = today;
-    console.log("✅ Monthly check counts reset.");
+  // Monthly reset for bulk checks
+  if (
+    now.getMonth() !== lastUpdated.getMonth() ||
+    now.getFullYear() !== lastUpdated.getFullYear()
+  ) {
+    userData.usage.bulkChecksThisMonth = 0;
   }
 
-  saveUsage(usage);
+  return userData;
 }
 
-// Helper to get IP usage
-function getUserUsage(ip) {
-  const usage = loadUsage();
-  if (!usage.users[ip]) usage.users[ip] = { daily: 0, monthly: 0 };
-  saveUsage(usage);
-  return usage;
+// ===== Simulated Check Function (Replace with your real WhatsApp API logic) =====
+async function checkNumber(number) {
+  await new Promise((resolve) => setTimeout(resolve, 200)); // simulate delay
+  return Math.random() > 0.3 ? "✅ Active" : "❌ Not Found"; // simulate result
 }
 
-app.use(express.static("public"));
-app.use(express.json());
+// ===== Single Check Route =====
+app.post("/check-single", async (req, res) => {
+  const { userId, number } = req.body;
+  if (!userId || !number) {
+    return res.status(400).json({ error: "Missing userId or number" });
+  }
 
-// Start WhatsApp socket
-async function start() {
-  const { state, saveCreds } = await useMultiFileAuthState("./sessions");
-  const { version } = await fetchLatestBaileysVersion();
+  let userData = await getUserData(userId);
+  userData = resetIfNewPeriod(userData);
 
-  sock = makeWASocket({
-    version,
-    auth: state,
-  });
+  const planLimits = PLAN_LIMITS[userData.plan];
+  if (userData.usage.singleChecksToday >= planLimits.singleCheckLimitPerDay) {
+    return res.json({ result: "⚠️ Daily single check limit reached" });
+  }
 
-  sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
-    if (qr) {
-      lastQR = qr;
-      connectionStatus = 'disconnected'; // ✅ when QR shown, it's not connected
-      console.log('\n📱 Scan this QR:\n');
-      qrcode.generate(qr, { small: true });
-    }
-  
-    if (connection === 'open') {
-      connectionStatus = 'connected'; // ✅ connected
-      lastQR = null;
-      console.log('✅ WhatsApp connected!');
-    } else if (connection === 'close') {
-      connectionStatus = 'disconnected'; // ✅ disconnected
-      const statusCode = lastDisconnect?.error?.output?.statusCode;
-      console.log('❌ Disconnected. Reason:', lastDisconnect?.error?.message);
-  
-      if (statusCode === 401) {
-        console.log('⚠️ Session invalid. Deleting sessions...')
-        fs.rmSync(SESSION_PATH, { recursive: true, force: true });
-        fs.mkdirSync(SESSION_PATH);
-    }
-    
-  
-      const shouldReconnect = statusCode !== 401;
-      if (shouldReconnect) {
-        console.log('🔁 Reconnecting...');
-        start(); // 👈 Restart connection
-      } else {
-        console.log('⛔ Cannot reconnect. Login required again.');
-      }
-    }
-  });
-  
+  // Perform check
+  const result = await checkNumber(number);
 
-  sock.ev.on("creds.update", saveCreds);
-}
+  // Update usage
+  userData.usage.singleChecksToday += 1;
+  userData.lastUpdated = admin.firestore.Timestamp.now();
+  await db.collection("users").doc(userId).set(userData);
 
-start();
-function hasReachedLimit(ip) {
-  resetIfNeeded();
-  const usage = getUserUsage(ip);
-  if (usage.users[ip].daily >= 10) return { limit: "daily" };
-  if (usage.users[ip].monthly >= 100) return { limit: "monthly" };
-  return null;
-}
-
-// 🔧 Routes
-app.get("/status", (req, res) => {
-  res.json({ connectionStatus });
+  res.json({ result });
 });
 
-app.get("/qr", (req, res) => {
-  if (lastQR) {
-    res.json({ qr: lastQR });
-  } else {
-    res.status(204).send();
-  }
-});
-
-app.post("/check", async (req, res) => {
-  const ipRaw = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-  const ip = (ipRaw.split(',')[0] || '').replace(/^::ffff:/, '').trim();
-
-  const { number } = req.body;
-  if (!number) return res.status(400).send({ error: "Number is required" });
-
-  const limitStatus = hasReachedLimit(ip);
-  if (limitStatus) {
-    return res.status(429).json({ error: `${limitStatus.limit} limit reached.` });
+// ===== Bulk Check Route =====
+app.post("/check-bulk", async (req, res) => {
+  const { userId, numbers } = req.body;
+  if (!userId || !Array.isArray(numbers)) {
+    return res.status(400).json({ error: "Missing userId or numbers array" });
   }
 
-  const results = await checkMany([number], ip);
-  res.json(results[0]);
-});
+  let userData = await getUserData(userId);
+  userData = resetIfNewPeriod(userData);
 
+  const planLimits = PLAN_LIMITS[userData.plan];
+  const results = [];
 
-app.post("/upload", upload.single("file"), async (req, res) => {
-  const ipRaw = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-  const ip = (ipRaw.split(',')[0] || '').replace(/^::ffff:/, '').trim();
+  for (let number of numbers) {
+    if (userData.usage.bulkChecksThisMonth >= planLimits.bulkCheckLimitPerMonth) {
+      // Append "limit reached" instead of stopping
+      results.push({ number, result: "⚠️ Bulk check limit reached" });
+    } else {
+      const result = await checkNumber(number);
+      results.push({ number, result });
 
-  const limitStatus = hasReachedLimit(ip);
-  if (limitStatus) {
-    return res.status(429).json({ error: `${limitStatus.limit} limit reached.` });
+      // Update usage count
+      userData.usage.bulkChecksThisMonth += 1;
+    }
   }
 
-  const file = req.file;
-  if (!file) return res.status(400).send({ error: "No file uploaded" });
+  userData.lastUpdated = admin.firestore.Timestamp.now();
+  await db.collection("users").doc(userId).set(userData);
 
-  let numbers = [];
-  if (file.mimetype === "text/plain") {
-    const content = fs.readFileSync(file.path, "utf-8");
-    numbers = content.split("\n").map(n => n.trim()).filter(Boolean);
-  } else if (file.mimetype === "text/csv") {
-    const rows = [];
-    fs.createReadStream(file.path)
-      .pipe(csv())
-      .on("data", (data) => rows.push(data))
-      .on("end", async () => {
-        numbers = rows.map((r) => Object.values(r)[0].trim());
-        const results = await checkMany(numbers, ip);
-        fs.unlinkSync(file.path);
-        res.json({ results });
-      });
-    return;
-  } else {
-    return res.status(400).send({ error: "Unsupported file type" });
-  }
-
-  const results = await checkMany(numbers, ip);
-  fs.unlinkSync(file.path);
   res.json({ results });
 });
 
-
-async function checkMany(numbers, ip) {
-  resetIfNeeded();
-  const usage = getUserUsage(ip);
-  const results = [];
-
-  for (const number of numbers) {
-    // Check limits BEFORE calling WhatsApp API
-    if (usage.users[ip].daily >= 10) {
-      results.push({ number, exists: null, error: "Daily limit reached." });
-      continue; // skip this number
-    }
-    if (usage.users[ip].monthly >= 100) {
-      results.push({ number, exists: null, error: "Monthly limit reached." });
-      continue; // skip this number
-    }
-
-    try {
-      const result = await sock.onWhatsApp(`${number}@s.whatsapp.net`);
-      const exists = result?.[0]?.exists || false;
-
-      // ✅ Increment usage only after a successful check
-      usage.users[ip].daily++;
-      usage.users[ip].monthly++;
-      saveUsage(usage);
-
-      results.push({ number, exists });
-    } catch {
-      results.push({ number, exists: null, error: "Error checking" });
-    }
-  }
-
-  return results;
-}
-
-
-
-
 app.listen(PORT, () => {
-  console.log(`🚀 Server running at http://localhost:${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });

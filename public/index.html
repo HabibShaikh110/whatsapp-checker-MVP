@@ -207,7 +207,22 @@ if (plan) {
 
       // setInterval(pollStatus, 3000);
       // pollStatus();
-    
+      results.forEach(r => {
+  let message;
+  if (r.error) {
+    message = r.error; // Show "Daily limit reached." instead of blank
+  } else if (r.exists) {
+    message = "✅ On WhatsApp";
+  } else {
+    message = "❌ Not on WhatsApp";
+  }
+
+  // Example for adding to results list
+  const li = document.createElement("li");
+  li.textContent = `${r.number}: ${message}`;
+  document.querySelector("#resultsList").appendChild(li);
+});
+
       async function checkSingle() {
         document.getElementById("checkingStatus").style.display = "block";
         const number = document.getElementById("numberInput").value;
