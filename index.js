@@ -115,6 +115,13 @@ async function start() {
 }
 
 start();
+function hasReachedLimit(ip) {
+  resetIfNeeded();
+  const usage = getUserUsage(ip);
+  if (usage.users[ip].daily >= 10) return { limit: "daily" };
+  if (usage.users[ip].monthly >= 100) return { limit: "monthly" };
+  return null;
+}
 
 // 🔧 Routes
 app.get("/status", (req, res) => {
@@ -136,19 +143,29 @@ app.post("/check", async (req, res) => {
   const { number } = req.body;
   if (!number) return res.status(400).send({ error: "Number is required" });
 
-  const results = await checkMany([number], ip); // Pass single number in array
-  res.json(results[0]); // Return only the first result
+  const limitStatus = hasReachedLimit(ip);
+  if (limitStatus) {
+    return res.status(429).json({ error: `${limitStatus.limit} limit reached.` });
+  }
+
+  const results = await checkMany([number], ip);
+  res.json(results[0]);
 });
+
 
 app.post("/upload", upload.single("file"), async (req, res) => {
   const ipRaw = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
   const ip = (ipRaw.split(',')[0] || '').replace(/^::ffff:/, '').trim();
 
+  const limitStatus = hasReachedLimit(ip);
+  if (limitStatus) {
+    return res.status(429).json({ error: `${limitStatus.limit} limit reached.` });
+  }
+
   const file = req.file;
   if (!file) return res.status(400).send({ error: "No file uploaded" });
 
   let numbers = [];
-
   if (file.mimetype === "text/plain") {
     const content = fs.readFileSync(file.path, "utf-8");
     numbers = content.split("\n").map(n => n.trim()).filter(Boolean);
@@ -172,6 +189,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
   fs.unlinkSync(file.path);
   res.json({ results });
 });
+
 
 async function checkMany(numbers, ip) {
   resetIfNeeded();
