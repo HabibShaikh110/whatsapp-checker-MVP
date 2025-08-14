@@ -207,22 +207,7 @@ if (plan) {
 
       // setInterval(pollStatus, 3000);
       // pollStatus();
-      results.forEach(r => {
-  let message;
-  if (r.error) {
-    message = r.error; // Show "Daily limit reached." instead of blank
-  } else if (r.exists) {
-    message = "✅ On WhatsApp";
-  } else {
-    message = "❌ Not on WhatsApp";
-  }
-
-  // Example for adding to results list
-  const li = document.createElement("li");
-  li.textContent = `${r.number}: ${message}`;
-  document.querySelector("#resultsList").appendChild(li);
-});
-
+    
       async function checkSingle() {
         document.getElementById("checkingStatus").style.display = "block";
         const number = document.getElementById("numberInput").value;
@@ -232,7 +217,7 @@ if (plan) {
           body: JSON.stringify({ number }),
         });
         if (res.status === 429) {
-  alert("Daily limit reached. Please try again tomorrow or upgrade your plan.");
+  alert("Get full access to bulk checks and higher speed, upgrade to Starter Plan or wait for 10 minutes");
   return;
 }
         const data = await res.json();
