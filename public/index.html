@@ -216,10 +216,6 @@ if (plan) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ number }),
         });
-        if (res.status === 429) {
-  alert("Get full access to bulk checks and higher speed, upgrade to Starter Plan or wait for 10 minutes");
-  return;
-}
         const data = await res.json();
         document.getElementById("results").innerText = data.exists
           ? `✅ ${data.number} is on WhatsApp`
