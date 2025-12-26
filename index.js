@@ -9,6 +9,8 @@ const {makeWASocket,
   fetchLatestBaileysVersion,
   useMultiFileAuthState,
 } = require("@whiskeysockets/baileys");
+require("dotenv").config();
+const { clerkMiddleware, requireAuth } = require("@clerk/express");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,8 +20,21 @@ let connectionStatus = "loading";
 let lastQR = null;
 let sock;
 
+app.use(clerkMiddleware());
+
 app.use(express.static("public"));
 app.use(express.json());
+
+// Clerk Sign-up.Sign-in
+// Public route (no login required)
+app.get("/", (req, res) => {
+  res.send("Welcome to WhatsValid 🚀(public route)");
+});
+
+// Protected route (login required)
+app.get("/dashboard", requireAuth(), (req, res) => {
+  res.send(`Hello ${req.auth.userId}, welcome to your dashboard!`);
+});
 
 // Start WhatsApp socket
 async function start() {
@@ -70,6 +85,7 @@ async function start() {
 
 start();
 
+
 // 🔧 Routes
 app.get("/status", (req, res) => {
   res.json({ connectionStatus });
@@ -83,7 +99,7 @@ app.get("/qr", (req, res) => {
   }
 });
 
-app.post("/check", async (req, res) => {
+app.post("/check", requireAuth(), async (req, res) => {
   const { number } = req.body;
   if (!number) return res.status(400).send({ error: "Number is required" });
 
@@ -95,7 +111,7 @@ app.post("/check", async (req, res) => {
     res.status(500).json({ error: "Failed to check number" });
   }
 });
-app.post("/upload", upload.single("file"), async (req, res) => {
+app.post("/upload", requireAuth(), upload.single("file"), async (req, res) => {
   const file = req.file;
   if (!file) return res.status(400).send({ error: "No file uploaded" });
 
