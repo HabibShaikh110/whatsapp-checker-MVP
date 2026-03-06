@@ -3,6 +3,7 @@
   <head>
     <link rel="shortcut icon" href="/images/5SSdze-LogoMakr.png" type="image/x-icon">
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>WhatsValid | App</title>
     <style>
       * {
@@ -37,12 +38,6 @@
         text-decoration: none;
         font-size: 14px;
       }
-      .nav-switch {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-}
-
   
       .wrapper {
         flex: 1;
@@ -167,157 +162,57 @@
 
     <script>
       // Detect selected plan from URL
-const urlParams = new URLSearchParams(window.location.search);
-const plan = urlParams.get('plan');
+      const urlParams = new URLSearchParams(window.location.search);
+      const plan = urlParams.get('plan');
 
-// Show plan in UI (for now, just to see it works)
-if (plan) {
-  const planEl = document.getElementById('planName');
-  if (planEl) {
-    planEl.innerText = `🚀 Selected Plan: ${plan.toUpperCase()}`;
-  }
-}
-
-      // async function pollStatus() {
-      //   const statusRes = await fetch("/status");
-      //   const { connectionStatus } = await statusRes.json();
-      //   const statusEl = document.getElementById("status");
-      //   const qrBox = document.getElementById("qrBox");
-      //   const qrImg = document.getElementById("qrImage");
-
-      //   if (connectionStatus === "connected") {
-      //     statusEl.innerText = "✅ WhatsApp is Connected!";
-      //     qrBox.style.display = "none";
-      //   } else if (connectionStatus === "disconnected") {
-      //     statusEl.innerText = "❌ Not connected. Scan QR below to connect:";
-      //     const qrRes = await fetch("/qr");
-      //     if (qrRes.status === 200) {
-      //       const { qr } = await qrRes.json();
-      //       qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(
-      //         qr
-      //       )}&size=200x200`;
-      //       qrBox.style.display = "block";
-      //     }
-      //   } else {
-      //     statusEl.innerText = "🔄 Loading...";
-      //   }
-      // }
-  
-
-
-      // setInterval(pollStatus, 3000);
-      // pollStatus();
-    
-      async function checkSingle() {
-        document.getElementById("checkingStatus").style.display = "block";
-        const number = document.getElementById("numberInput").value;
-        const res = await fetch("/check", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ number }),
-        });
-        const data = await res.json();
-        document.getElementById("results").innerText = data.exists
-          ? `✅ ${data.number} is on WhatsApp`
-          : `❌ ${data.number} is NOT on WhatsApp`;
-        document.getElementById("checkingStatus").style.display = "none";
+      if (plan) {
+        const planEl = document.getElementById('planName');
+        if (planEl) {
+          planEl.textContent = '\u{1F680} Selected Plan: ' + plan.toUpperCase();
+        }
       }
 
-      document
-        .getElementById("bulkForm").addEventListener("submit", async function (e) {
-        e.preventDefault();
-          document.getElementById("checkingBulkStatus").style.display = "block";
+      function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      }
 
-          const fileInput = document.getElementById("fileInput");
-          const file = fileInput.files[0];
-          if (!file) return alert("Please select a file.");
+      async function checkSingle() {
+        const number = document.getElementById("numberInput").value.trim();
+        const resultsEl = document.getElementById("results");
+        const statusEl = document.getElementById("checkingStatus");
 
-          const formData = new FormData();
-          formData.append("file", file);
-
-          const res = await fetch("/upload", {
-            method: "POST",
-            body: formData,
-          });
-
-          const data = await res.json();
-          const tableBody = document.querySelector("#result-table tbody");
-          tableBody.innerHTML = "";
-
-          if (data.results) {
-            data.results.forEach((item, index) => {
-              const row = document.createElement("tr");
-              row.innerHTML = `
-        <td>${index + 1}</td>
-        <td>${item.number}</td>
-        <td>${
-          item.exists === true
-            ? "✅ Valid"
-            : item.exists === false
-            ? "❌ Invalid"
-            : "⚠️ Error"
-        }</td>
-      `;
-              tableBody.appendChild(row);
-              document.getElementById("checkingBulkStatus").style.display =
-                "none";
-                
-            });
-
-
-            // 🔐 Save results for download
-            window.bulkResults = data.results;
-            console.log("🔍 Bulk results stored:", window.bulkResults);
-            document.getElementById("bulk-result-section").style.display =
-              "block";
-          } else {
-            alert("No results found.");
-          }
-        });
-
-      function downloadExcel() {
-        if (!window.bulkResults || window.bulkResults.length === 0) {
-          alert("No bulk results to download.");
+        if (!number) {
+          resultsEl.textContent = "Please enter a phone number.";
           return;
         }
 
-        const rows = [
-          ["#", "Phone Number", "Status"],
-          ...window.bulkResults.map((item, index) => [
-            index + 1,
-            `="${item.number}"`, // ✅ Wrap number to preserve formatting
-            item.exists === true
-              ? "Valid"
-              : item.exists === false
-              ? "Invalid"
-              : "Error",
-          ]),
-        ];
+        statusEl.style.display = "block";
+        resultsEl.textContent = "";
 
-        const csvContent =
-          "\uFEFF" +
-          rows
-            .map((row) =>
-              row
-                .map(String) // convert each item to string
-                .map((cell) => `"${cell.replace(/"/g, '""')}"`) // escape double quotes
-                .join(",")
-            )
-            .join("\r\n");
+        try {
+          const res = await fetch("/check", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ number }),
+          });
 
-        const blob = new Blob([csvContent], {
-          type: "text/csv;charset=utf-8;",
-        });
-        const link = document.createElement("a");
-        const url = URL.createObjectURL(blob);
-        link.setAttribute("href", url);
-        link.setAttribute("download", "bulk-results.csv");
-        link.style.visibility = "hidden";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+          const data = await res.json();
+
+          if (data.error) {
+            resultsEl.textContent = data.error;
+          } else {
+            resultsEl.textContent = data.exists
+              ? '\u2705 ' + data.number + ' is on WhatsApp'
+              : '\u274C ' + data.number + ' is NOT on WhatsApp';
+          }
+        } catch (err) {
+          resultsEl.textContent = "Failed to check number. Please try again.";
+        }
+
+        statusEl.style.display = "none";
       }
-      
     </script>
   </body>
 </html>

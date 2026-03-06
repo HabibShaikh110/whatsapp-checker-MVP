@@ -8,19 +8,34 @@ const path = require("path");
 const {makeWASocket,
   fetchLatestBaileysVersion,
   useMultiFileAuthState,
+  DisconnectReason,
 } = require("@whiskeysockets/baileys");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-const upload = multer({ dest: "uploads/" });
+const PORT = process.env.PORT || 5500;
+const upload = multer({
+  dest: "uploads/",
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+});
 
 let connectionStatus = "loading";
 let lastQR = null;
 let sock;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
 
 app.use(express.static("public"));
 app.use(express.json());
-// Public route (no login required)
+
+// Validate phone number: only digits, optionally starting with +
+function isValidPhoneNumber(number) {
+  return /^\+?\d{7,15}$/.test(number);
+}
+
+function getReconnectDelay() {
+  // Exponential backoff: 2s, 4s, 8s, 16s, 32s
+  return Math.min(2000 * Math.pow(2, reconnectAttempts), 32000);
+}
 
 // Start WhatsApp socket
 async function start() {
@@ -30,41 +45,58 @@ async function start() {
   sock = makeWASocket({
     version,
     auth: state,
+    defaultQueryTimeoutMs: undefined,
   });
 
   sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
     if (qr) {
       lastQR = qr;
-      connectionStatus = 'disconnected'; // ✅ when QR shown, it's not connected
+      connectionStatus = 'disconnected';
       console.log('\n📱 Scan this QR:\n');
       qrcode.generate(qr, { small: true });
     }
-  
+
     if (connection === 'open') {
-      connectionStatus = 'connected'; // ✅ connected
+      connectionStatus = 'connected';
       lastQR = null;
+      reconnectAttempts = 0; // Reset on successful connection
       console.log('✅ WhatsApp connected!');
     } else if (connection === 'close') {
-      connectionStatus = 'disconnected'; // ✅ disconnected
+      connectionStatus = 'disconnected';
       const statusCode = lastDisconnect?.error?.output?.statusCode;
-      console.log('❌ Disconnected. Reason:', lastDisconnect?.error?.message);
-  
-      if (statusCode === 401) {
+      const reason = lastDisconnect?.error?.message || 'Unknown';
+      console.log(`❌ Disconnected. Code: ${statusCode}, Reason: ${reason}`);
+
+      // Handle session invalid (logged out)
+      if (statusCode === DisconnectReason.loggedOut) {
         console.log('⚠️ Session invalid. Deleting sessions...');
         fs.rmSync(SESSION_PATH, { recursive: true, force: true });
+        console.log('⛔ Cannot reconnect. Login required again. Restart the server.');
+        return;
       }
-  
-      const shouldReconnect = statusCode !== 401;
-      if (shouldReconnect) {
-        console.log('🔁 Reconnecting...');
-        start(); // 👈 Restart connection
-      } else {
-        console.log('⛔ Cannot reconnect. Login required again.');
+
+      // Handle conflict (another device replaced this session)
+      if (statusCode === DisconnectReason.connectionReplaced) {
+        console.log('⚠️ Connection replaced by another session. Not reconnecting to avoid loop.');
+        console.log('⛔ Restart the server manually if needed.');
+        return;
       }
+
+      // For other errors, reconnect with backoff
+      if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        console.log(`⛔ Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached. Restart the server.`);
+        return;
+      }
+
+      reconnectAttempts++;
+      const delay = getReconnectDelay();
+      console.log(`🔁 Reconnecting in ${delay / 1000}s... (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+
+      setTimeout(() => {
+        start();
+      }, delay);
     }
   });
-  
-  
 
   sock.ev.on("creds.update", saveCreds);
 }
@@ -86,53 +118,77 @@ app.get("/qr", (req, res) => {
 });
 
 app.post("/check", async (req, res) => {
+  if (!sock || connectionStatus !== 'connected') {
+    return res.status(503).json({ error: "WhatsApp is not connected yet" });
+  }
+
   const { number } = req.body;
-  if (!number) return res.status(400).send({ error: "Number is required" });
+  if (!number) return res.status(400).json({ error: "Number is required" });
+
+  const cleaned = String(number).replace(/[\s\-()]/g, "");
+  if (!isValidPhoneNumber(cleaned)) {
+    return res.status(400).json({ error: "Invalid phone number format" });
+  }
 
   try {
-    const result = await sock.onWhatsApp(`${number}@s.whatsapp.net`);
-    res.json({ number, exists: result?.[0]?.exists || false });
+    const result = await sock.onWhatsApp(`${cleaned}@s.whatsapp.net`);
+    res.json({ number: cleaned, exists: result?.[0]?.exists || false });
   } catch (err) {
     console.error("❌ Error checking number:", err);
     res.status(500).json({ error: "Failed to check number" });
   }
 });
+
 app.post("/upload", upload.single("file"), async (req, res) => {
+  if (!sock || connectionStatus !== 'connected') {
+    return res.status(503).json({ error: "WhatsApp is not connected yet" });
+  }
+
   const file = req.file;
-  if (!file) return res.status(400).send({ error: "No file uploaded" });
+  if (!file) return res.status(400).json({ error: "No file uploaded" });
+
+  const cleanupFile = () => {
+    try { fs.unlinkSync(file.path); } catch {}
+  };
 
   let numbers = [];
 
-  if (file.mimetype === "text/plain") {
-    const content = fs.readFileSync(file.path, "utf-8");
-    numbers = content
-      .split("\n")
-      .map((n) => n.trim())
-      .filter(Boolean);
-  } else if (file.mimetype === "text/csv") {
-    const rows = [];
-    fs.createReadStream(file.path)
-      .pipe(csv())
-      .on("data", (data) => rows.push(data))
-      .on("end", async () => {
-        numbers = rows.map((r) => Object.values(r)[0].trim());
-        const results = await checkMany(numbers);
-        fs.unlinkSync(file.path);
-        res.json({ results });
+  try {
+    if (file.mimetype === "text/plain") {
+      const content = fs.readFileSync(file.path, "utf-8");
+      numbers = content
+        .split("\n")
+        .map((n) => n.trim())
+        .filter(Boolean);
+    } else if (file.mimetype === "text/csv") {
+      const rows = [];
+      await new Promise((resolve, reject) => {
+        fs.createReadStream(file.path)
+          .pipe(csv())
+          .on("data", (data) => rows.push(data))
+          .on("end", resolve)
+          .on("error", reject);
       });
-    return;
-  } else {
-    return res.status(400).send({ error: "Unsupported file type" });
-  }
+      numbers = rows.map((r) => Object.values(r)[0]?.trim()).filter(Boolean);
+    } else {
+      cleanupFile();
+      return res.status(400).json({ error: "Unsupported file type. Use .txt or .csv" });
+    }
 
-  const results = await checkMany(numbers);
-  fs.unlinkSync(file.path);
-  res.json({ results });
+    const results = await checkMany(numbers);
+    cleanupFile();
+    res.json({ results });
+  } catch (err) {
+    console.error("❌ Error processing upload:", err);
+    cleanupFile();
+    res.status(500).json({ error: "Failed to process file" });
+  }
 });
 
 async function checkMany(numbers) {
   const results = [];
-  for (const number of numbers) {
+  for (const raw of numbers) {
+    const number = String(raw).replace(/[\s\-()]/g, "");
     try {
       const result = await sock.onWhatsApp(`${number}@s.whatsapp.net`);
       results.push({ number, exists: result?.[0]?.exists || false });

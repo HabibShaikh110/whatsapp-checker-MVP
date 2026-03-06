@@ -151,19 +151,20 @@
         <div class="logo">WhatsValid</div>
           <a href="/index.html">Switch to Single Check</a>
         <a href="https://wa.bnbcloudservices.com">← Back to Main Site</a>
-      </div>
+    </div>
 
     <form id="bulkForm">
         <h3>📂 Bulk Check (.txt or .csv)</h3>
-        <input type="file" id="fileInput" />
+        <input type="file" id="fileInput" accept=".txt,.csv" />
         <button type="submit">Upload</button>
         <div id="checkingBulkStatus" style="display: none">
-          ⏳Checking Numbers...
+          ⏳ Checking Numbers...
         </div>
         <div id="bulkResults"></div>
-      </form>
-      <!-- Result Table -->
-      <div id="bulk-result-section" style="display: none; margin-top: 20px">
+    </form>
+
+    <!-- Result Table -->
+    <div id="bulk-result-section" style="display: none; margin-top: 20px">
         <h3>✅ Bulk Check Results:</h3>
         <table border="1" id="result-table">
           <thead>
@@ -176,61 +177,83 @@
           <tbody></tbody>
         </table>
         <button onclick="downloadExcel()">⬇️ Download Excel</button>
-      </div>
     </div>
+
     <div class="footer">
-      <p>Powererd By Testing Item</p>
+      <p>Powered By Testing Item</p>
     </div>
+
     <script>
-        document
+      function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+      document
         .getElementById("bulkForm").addEventListener("submit", async function (e) {
         e.preventDefault();
           document.getElementById("checkingBulkStatus").style.display = "block";
           const fileInput = document.getElementById("fileInput");
           const file = fileInput.files[0];
-          if (!file) return alert("Please select a file.");
+          if (!file) {
+            document.getElementById("checkingBulkStatus").style.display = "none";
+            return alert("Please select a file.");
+          }
 
           const formData = new FormData();
           formData.append("file", file);
 
-          const res = await fetch("/upload", {
-            method: "POST",
-            body: formData,
-          });
-
-          const data = await res.json();
-          const tableBody = document.querySelector("#result-table tbody");
-          tableBody.innerHTML = "";
-
-          if (data.results) {
-            data.results.forEach((item, index) => {
-              const row = document.createElement("tr");
-              row.innerHTML = `
-        <td>${index + 1}</td>
-        <td>${item.number}</td>
-        <td>${
-          item.exists === true
-            ? "✅ Valid"
-            : item.exists === false
-            ? "❌ Invalid"
-            : "⚠️ Error"
-        }</td>
-      `;
-              tableBody.appendChild(row);
-              document.getElementById("checkingBulkStatus").style.display =
-                "none";
-                
+          try {
+            const res = await fetch("/upload", {
+              method: "POST",
+              body: formData,
             });
 
+            const data = await res.json();
 
-            // 🔐 Save results for download
-            window.bulkResults = data.results;
-            console.log("🔍 Bulk results stored:", window.bulkResults);
-            document.getElementById("bulk-result-section").style.display =
-              "block";
-          } else {
-            alert("No results found.");
+            if (data.error) {
+              document.getElementById("checkingBulkStatus").style.display = "none";
+              return alert(data.error);
+            }
+
+            const tableBody = document.querySelector("#result-table tbody");
+            tableBody.innerHTML = "";
+
+            if (data.results && data.results.length > 0) {
+              data.results.forEach((item, index) => {
+                const row = document.createElement("tr");
+
+                const tdNum = document.createElement("td");
+                tdNum.textContent = index + 1;
+
+                const tdPhone = document.createElement("td");
+                tdPhone.textContent = item.number;
+
+                const tdStatus = document.createElement("td");
+                tdStatus.textContent = item.exists === true
+                  ? "\u2705 Valid"
+                  : item.exists === false
+                  ? "\u274C Invalid"
+                  : "\u26A0\uFE0F Error";
+
+                row.appendChild(tdNum);
+                row.appendChild(tdPhone);
+                row.appendChild(tdStatus);
+                tableBody.appendChild(row);
+              });
+
+              // Save results for download
+              window.bulkResults = data.results;
+              document.getElementById("bulk-result-section").style.display = "block";
+            } else {
+              alert("No results found.");
+            }
+          } catch (err) {
+            alert("Failed to upload file. Please try again.");
           }
+
+          document.getElementById("checkingBulkStatus").style.display = "none";
         });
 
       function downloadExcel() {
@@ -243,7 +266,7 @@
           ["#", "Phone Number", "Status"],
           ...window.bulkResults.map((item, index) => [
             index + 1,
-            `="${item.number}"`, // ✅ Wrap number to preserve formatting
+            '="' + item.number + '"',
             item.exists === true
               ? "Valid"
               : item.exists === false
@@ -257,8 +280,8 @@
           rows
             .map((row) =>
               row
-                .map(String) // convert each item to string
-                .map((cell) => `"${cell.replace(/"/g, '""')}"`) // escape double quotes
+                .map(String)
+                .map((cell) => '"' + cell.replace(/"/g, '""') + '"')
                 .join(",")
             )
             .join("\r\n");
