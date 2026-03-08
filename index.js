@@ -8,6 +8,13 @@ const dotenv = require("dotenv");
 const { verifyToken } = require("@clerk/backend");
 dotenv.config();
 
+// Clerk Client
+const { createClerkClient } = require("@clerk/backend");
+
+const clerkClient = createClerkClient({
+  secretKey: process.env.CLERK_SECRET_KEY,
+});
+
 const SESSION_PATH = './sessions';
 const path = require("path");
 const {makeWASocket,
@@ -245,6 +252,77 @@ app.get("/user/dashboard", authenticateUser, async (req, res) => {
     userId: req.user.sub,
     email: req.user.email_addresses?.[0]?.email_address || "N/A",
     message: "Welcome! Auth is working.",
+  });
+});
+
+// Sign up Clerk
+app.post("/auth/signup", async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: "Email and password required" });
+  }
+
+  try {
+    const user = await clerkClient.users.createUser({
+      emailAddress: [email],
+      password: password,
+    });
+
+    res.json({
+      success: true,
+      userId: user.id,
+      email: user.emailAddresses[0].emailAddress,
+    });
+  } catch (err) {
+    console.error("❌ Sign up error:", err.message);
+    res.status(400).json({ error: err.message || "Sign up failed" });
+  }
+});
+
+// Sign in
+app.post("/auth/signin", async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: "Email and password required" });
+  }
+
+  try {
+    // Verify password with Clerk
+    const users = await clerkClient.users.getUserList({
+      emailAddress: [email],
+    });
+
+    if (users.length === 0) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const user = users[0];
+
+    // Generate session token
+    const token = await clerkClient.sessions.createSession({
+      userId: user.id,
+      sessionToken: true,
+    });
+
+    res.json({
+      success: true,
+      token: token.sessionToken,
+      userId: user.id,
+      email: user.emailAddresses[0].emailAddress,
+    });
+  } catch (err) {
+    console.error("❌ Sign in error:", err.message);
+    res.status(401).json({ error: "Invalid credentials" });
+  }
+});
+
+// Verify token
+app.get("/auth/verify", authenticateUser, (req, res) => {
+  res.json({
+    valid: true,
+    user: req.user,
   });
 });
 

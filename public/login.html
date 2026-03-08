@@ -39,6 +39,9 @@
       font-size: 14px;
       text-align: center;
     }
+    .form-container {
+      margin-bottom: 20px;
+    }
     .form-group {
       margin-bottom: 15px;
     }
@@ -86,15 +89,55 @@
     button:active {
       transform: translateY(0);
     }
+    button:disabled {
+      background: #999;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .error {
+      color: #e74c3c;
+      font-size: 12px;
+      margin-top: 5px;
+      display: none;
+      padding: 8px 10px;
+      background: #fadbd8;
+      border-radius: 4px;
+    }
+    .success {
+      color: #27ae60;
+      font-size: 12px;
+      margin-top: 5px;
+      display: none;
+      padding: 8px 10px;
+      background: #d5f4e6;
+      border-radius: 4px;
+    }
+    .toggle-form {
+      text-align: center;
+      margin-top: 15px;
+      font-size: 13px;
+      color: #666;
+    }
+    .toggle-form button {
+      background: none;
+      color: #667eea;
+      padding: 0;
+      margin: 0;
+      transform: none;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .toggle-form button:hover {
+      text-decoration: underline;
+    }
     .user-info {
       display: none;
+      text-align: center;
       margin-top: 20px;
       padding-top: 20px;
       border-top: 1px solid #eee;
-      text-align: center;
     }
     .user-info p {
-      text-align: left;
       color: #333;
       margin-bottom: 10px;
       font-size: 14px;
@@ -106,12 +149,12 @@
       word-break: break-all;
       font-family: monospace;
       margin-bottom: 15px;
-      text-align: left;
     }
     .btn-app {
       background: #667eea;
       width: 100%;
       margin-bottom: 5px;
+      display: block;
     }
     .btn-logout {
       background: #e74c3c;
@@ -120,14 +163,10 @@
     .btn-logout:hover {
       background: #c0392b;
     }
-    .error {
-      color: #e74c3c;
-      font-size: 12px;
-      margin-top: 5px;
+    .loading {
       display: none;
-    }
-    #auth-section {
-      display: block;
+      text-align: center;
+      color: #667eea;
     }
   </style>
 </head>
@@ -137,20 +176,71 @@
     <p>Sign in to check numbers</p>
     
     <div id="auth-section">
-      <div class="form-group">
-        <label for="email">Email</label>
-        <input 
-          type="email" 
-          id="email" 
-          placeholder="your@email.com"
-          autocomplete="email"
-        />
-        <div class="error" id="email-error">Please enter a valid email</div>
+      <!-- Sign In Form -->
+      <div id="signin-form" class="form-container">
+        <h2 style="font-size: 18px; color: #333; margin-bottom: 20px;">Sign In</h2>
+        <div class="form-group">
+          <label for="signin-email">Email</label>
+          <input 
+            type="email" 
+            id="signin-email" 
+            placeholder="your@email.com"
+            autocomplete="email"
+          />
+        </div>
+        <div class="form-group">
+          <label for="signin-password">Password</label>
+          <input 
+            type="password" 
+            id="signin-password" 
+            placeholder="••••••••"
+            autocomplete="current-password"
+          />
+        </div>
+        <div class="error" id="signin-error"></div>
+        <div class="success" id="signin-success"></div>
+        <button onclick="handleSignIn()" id="signin-btn">Sign In</button>
+        <div class="toggle-form">
+          Don't have an account? <button onclick="toggleForm()">Sign Up</button>
+        </div>
       </div>
 
-      <div class="buttons">
-        <button onclick="handleSignUp()">Sign Up</button>
-        <button onclick="handleSignIn()">Sign In</button>
+      <!-- Sign Up Form -->
+      <div id="signup-form" class="form-container" style="display: none;">
+        <h2 style="font-size: 18px; color: #333; margin-bottom: 20px;">Create Account</h2>
+        <div class="form-group">
+          <label for="signup-email">Email</label>
+          <input 
+            type="email" 
+            id="signup-email" 
+            placeholder="your@email.com"
+            autocomplete="email"
+          />
+        </div>
+        <div class="form-group">
+          <label for="signup-password">Password</label>
+          <input 
+            type="password" 
+            id="signup-password" 
+            placeholder="••••••••"
+            autocomplete="new-password"
+          />
+        </div>
+        <div class="form-group">
+          <label for="signup-confirm">Confirm Password</label>
+          <input 
+            type="password" 
+            id="signup-confirm" 
+            placeholder="••••••••"
+            autocomplete="new-password"
+          />
+        </div>
+        <div class="error" id="signup-error"></div>
+        <div class="success" id="signup-success"></div>
+        <button onclick="handleSignUp()" id="signup-btn">Sign Up</button>
+        <div class="toggle-form">
+          Already have an account? <button onclick="toggleForm()">Sign In</button>
+        </div>
       </div>
     </div>
 
@@ -164,22 +254,158 @@
   </div>
 
   <script>
-    // Simple JWT generation (for MVP testing)
-    function generateSimpleJWT(email) {
-      // Create a simple JWT-like token: header.payload.signature
-      const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-      const payload = btoa(JSON.stringify({
-        sub: email.replace(/[^a-zA-Z0-9]/g, '_'),
-        email: email,
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + 86400 // 24 hours
-      }));
-      const signature = btoa("secret_key_mvp"); // Simple signature for MVP
-      return `${header}.${payload}.${signature}`;
-    }
-
     function isValidEmail(email) {
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }
+
+    function showError(elementId, message) {
+      const errorEl = document.getElementById(elementId);
+      errorEl.textContent = message;
+      errorEl.style.display = "block";
+    }
+
+    function hideError(elementId) {
+      const errorEl = document.getElementById(elementId);
+      errorEl.style.display = "none";
+    }
+
+    function showSuccess(elementId, message) {
+      const successEl = document.getElementById(elementId);
+      successEl.textContent = message;
+      successEl.style.display = "block";
+    }
+
+    function toggleForm() {
+      const signinForm = document.getElementById("signin-form");
+      const signupForm = document.getElementById("signup-form");
+      
+      signinForm.style.display = signinForm.style.display === "none" ? "block" : "none";
+      signupForm.style.display = signupForm.style.display === "none" ? "block" : "none";
+      
+      // Clear errors
+      hideError("signin-error");
+      hideError("signup-error");
+    }
+
+    async function handleSignUp() {
+      const email = document.getElementById("signup-email").value.trim();
+      const password = document.getElementById("signup-password").value;
+      const confirm = document.getElementById("signup-confirm").value;
+      const btn = document.getElementById("signup-btn");
+
+      hideError("signup-error");
+
+      if (!isValidEmail(email)) {
+        showError("signup-error", "Invalid email format");
+        return;
+      }
+
+      if (password.length < 8) {
+        showError("signup-error", "Password must be at least 8 characters");
+        return;
+      }
+
+      if (password !== confirm) {
+        showError("signup-error", "Passwords don't match");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = "Creating account...";
+
+      try {
+        const response = await fetch("/auth/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          showError("signup-error", data.error || "Sign up failed");
+          btn.disabled = false;
+          btn.textContent = "Sign Up";
+          return;
+        }
+
+        // Sign up successful, auto sign in
+        const signinResponse = await fetch("/auth/signin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+
+        const signinData = await signinResponse.json();
+
+        if (signinResponse.ok) {
+          localStorage.setItem("clerk_token", signinData.token);
+          localStorage.setItem("user_email", email);
+          showSuccess("signup-success", "Account created! Redirecting...");
+          setTimeout(() => location.reload(), 1500);
+        }
+      } catch (err) {
+        showError("signup-error", "Network error. Try again.");
+        btn.disabled = false;
+        btn.textContent = "Sign Up";
+      }
+    }
+
+    async function handleSignIn() {
+      const email = document.getElementById("signin-email").value.trim();
+      const password = document.getElementById("signin-password").value;
+      const btn = document.getElementById("signin-btn");
+
+      hideError("signin-error");
+
+      if (!isValidEmail(email)) {
+        showError("signin-error", "Invalid email format");
+        return;
+      }
+
+      if (!password) {
+        showError("signin-error", "Password required");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = "Signing in...";
+
+      try {
+        const response = await fetch("/auth/signin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          showError("signin-error", data.error || "Sign in failed");
+          btn.disabled = false;
+          btn.textContent = "Sign In";
+          return;
+        }
+
+        localStorage.setItem("clerk_token", data.token);
+        localStorage.setItem("user_email", email);
+        showSuccess("signin-success", "Signed in! Redirecting...");
+        setTimeout(() => location.reload(), 1500);
+      } catch (err) {
+        showError("signin-error", "Network error. Try again.");
+        btn.disabled = false;
+        btn.textContent = "Sign In";
+      }
+    }
+
+    function handleLogout() {
+      localStorage.removeItem("clerk_token");
+      localStorage.removeItem("user_email");
+      location.reload();
+    }
+
+    function goToApp() {
+      window.location.href = "/index.html";
     }
 
     function checkAuth() {
@@ -193,60 +419,14 @@
       }
     }
 
-    function handleSignUp() {
-      const email = document.getElementById("email").value.trim();
-      const errorEl = document.getElementById("email-error");
-
-      if (!isValidEmail(email)) {
-        errorEl.style.display = "block";
-        return;
-      }
-
-      errorEl.style.display = "none";
-      const token = generateSimpleJWT(email);
-      localStorage.setItem("clerk_token", token);
-      localStorage.setItem("user_email", email);
-      
-      alert("✅ Signed up! Redirecting...");
-      location.reload();
-    }
-
-    function handleSignIn() {
-      const email = document.getElementById("email").value.trim();
-      const errorEl = document.getElementById("email-error");
-
-      if (!isValidEmail(email)) {
-        errorEl.style.display = "block";
-        return;
-      }
-
-      errorEl.style.display = "none";
-      const token = generateSimpleJWT(email);
-      localStorage.setItem("clerk_token", token);
-      localStorage.setItem("user_email", email);
-      
-      alert("✅ Signed in! Redirecting...");
-      location.reload();
-    }
-
-    function handleLogout() {
-      localStorage.removeItem("clerk_token");
-      localStorage.removeItem("user_email");
-      location.reload();
-    }
-
-    function goToApp() {
-      window.location.href = "/index.html";
-    }
-
-    // Check auth on page load
     document.addEventListener("DOMContentLoaded", checkAuth);
 
-    // Allow Enter key to sign in
-    document.getElementById("email")?.addEventListener("keypress", (e) => {
-      if (e.key === "Enter") {
-        handleSignIn();
-      }
+    // Allow Enter key
+    document.getElementById("signin-password")?.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") handleSignIn();
+    });
+    document.getElementById("signup-confirm")?.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") handleSignUp();
     });
   </script>
 </body>
