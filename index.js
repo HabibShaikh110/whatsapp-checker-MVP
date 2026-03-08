@@ -42,11 +42,24 @@ const authenticateUser = async (req, res, next) => {
   }
   
   try {
-    const decoded = await verifyToken(token, {
-      secretKey: process.env.CLERK_SECRET_KEY,
-    });
-    req.user = decoded;
-    next();
+    // Handle simple JWT (for MVP)
+    const parts = token.split('.');
+    if (parts.length === 3) {
+      // Simple JWT format
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+      req.user = {
+        sub: payload.sub,
+        email_addresses: [{ email_address: payload.email }]
+      };
+      next();
+    } else {
+      // Try Clerk verification as fallback
+      const decoded = await verifyToken(token, {
+        secretKey: process.env.CLERK_SECRET_KEY,
+      });
+      req.user = decoded;
+      next();
+    }
   } catch (err) {
     console.error("❌ Token verification failed:", err.message);
     res.status(401).json({ error: "Unauthorized" });

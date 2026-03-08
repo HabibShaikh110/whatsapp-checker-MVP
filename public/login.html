@@ -4,13 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WhatsApp Checker - Login</title>
-  <!-- Clerk Script -->
-  <script
-    async
-    crossorigin="anonymous"
-    data-clerk-publishable-key=pk_test_YWJzb2x1dGUtcGVnYXN1cy0yOS5jbGVyay5hY2NvdW50cy5kZXYk
-    src="https://cdn.clerk.com/clerk.js"
-  ></script>
   <style>
     * {
       margin: 0;
@@ -24,6 +17,7 @@
       justify-content: center;
       align-items: center;
       height: 100vh;
+      padding: 20px;
     }
     .container {
       background: white;
@@ -31,27 +25,73 @@
       border-radius: 10px;
       box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
       max-width: 400px;
-      width: 90%;
-      text-align: center;
+      width: 100%;
     }
     h1 {
       color: #333;
       margin-bottom: 10px;
       font-size: 28px;
+      text-align: center;
     }
     p {
       color: #666;
       margin-bottom: 30px;
       font-size: 14px;
+      text-align: center;
     }
-    .clerk-container {
-      margin: 20px 0;
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      color: #333;
+      font-weight: 600;
+      margin-bottom: 5px;
+      font-size: 14px;
+    }
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    .buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    button {
+      flex: 1;
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    button:hover {
+      background: #764ba2;
+      transform: translateY(-2px);
+    }
+    button:active {
+      transform: translateY(0);
     }
     .user-info {
       display: none;
       margin-top: 20px;
       padding-top: 20px;
       border-top: 1px solid #eee;
+      text-align: center;
     }
     .user-info p {
       text-align: left;
@@ -61,43 +101,33 @@
     }
     .user-info .email {
       background: #f5f5f5;
-      padding: 8px 12px;
+      padding: 10px 12px;
       border-radius: 4px;
       word-break: break-all;
       font-family: monospace;
       margin-bottom: 15px;
+      text-align: left;
     }
-    .btn-primary {
+    .btn-app {
       background: #667eea;
-      color: white;
-      border: none;
-      padding: 12px 20px;
-      border-radius: 6px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
       width: 100%;
-      margin-top: 10px;
-      transition: all 0.3s ease;
-    }
-    .btn-primary:hover {
-      background: #764ba2;
+      margin-bottom: 5px;
     }
     .btn-logout {
       background: #e74c3c;
-      color: white;
-      border: none;
-      padding: 12px 20px;
-      border-radius: 6px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
       width: 100%;
-      margin-top: 5px;
-      transition: all 0.3s ease;
     }
     .btn-logout:hover {
       background: #c0392b;
+    }
+    .error {
+      color: #e74c3c;
+      font-size: 12px;
+      margin-top: 5px;
+      display: none;
+    }
+    #auth-section {
+      display: block;
     }
   </style>
 </head>
@@ -106,61 +136,118 @@
     <h1>✓ WhatsApp Checker</h1>
     <p>Sign in to check numbers</p>
     
-    <div id="auth-section" class="clerk-container">
-      <!-- Clerk will render here -->
+    <div id="auth-section">
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input 
+          type="email" 
+          id="email" 
+          placeholder="your@email.com"
+          autocomplete="email"
+        />
+        <div class="error" id="email-error">Please enter a valid email</div>
+      </div>
+
+      <div class="buttons">
+        <button onclick="handleSignUp()">Sign Up</button>
+        <button onclick="handleSignIn()">Sign In</button>
+      </div>
     </div>
 
     <div class="user-info" id="user-info">
       <p><strong>✅ Logged in!</strong></p>
       <p>Email:</p>
       <div class="email" id="user-email">-</div>
-      <button class="btn-primary" onclick="goToApp()">Go to App</button>
+      <button class="btn-app" onclick="goToApp()">Go to App →</button>
       <button class="btn-logout" onclick="handleLogout()">Logout</button>
     </div>
   </div>
 
   <script>
-    // Wait for Clerk to load
-    window.addEventListener('load', async () => {
-      await Clerk.load();
+    // Simple JWT generation (for MVP testing)
+    function generateSimpleJWT(email) {
+      // Create a simple JWT-like token: header.payload.signature
+      const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+      const payload = btoa(JSON.stringify({
+        sub: email.replace(/[^a-zA-Z0-9]/g, '_'),
+        email: email,
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 86400 // 24 hours
+      }));
+      const signature = btoa("secret_key_mvp"); // Simple signature for MVP
+      return `${header}.${payload}.${signature}`;
+    }
 
-      const user = Clerk.user;
+    function isValidEmail(email) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }
 
-      if (user) {
-        // User is logged in
+    function checkAuth() {
+      const token = localStorage.getItem("clerk_token");
+      const email = localStorage.getItem("user_email");
+      
+      if (token && email) {
         document.getElementById("auth-section").style.display = "none";
         document.getElementById("user-info").style.display = "block";
-        document.getElementById("user-email").textContent = user.primaryEmailAddress?.emailAddress || "User";
-
-        // Store token for API calls
-        const token = await user.getIdToken();
-        localStorage.setItem("clerk_token", token);
-      } else {
-        // User not logged in - show Clerk signin widget
-        document.getElementById("auth-section").style.display = "block";
-        document.getElementById("user-info").style.display = "none";
-
-        Clerk.mountSignIn(document.getElementById("auth-section"), {
-          appearance: {
-            elements: {
-              rootBox: "w-full",
-              card: "shadow-none border-0"
-            }
-          }
-        });
+        document.getElementById("user-email").textContent = email;
       }
-    });
+    }
+
+    function handleSignUp() {
+      const email = document.getElementById("email").value.trim();
+      const errorEl = document.getElementById("email-error");
+
+      if (!isValidEmail(email)) {
+        errorEl.style.display = "block";
+        return;
+      }
+
+      errorEl.style.display = "none";
+      const token = generateSimpleJWT(email);
+      localStorage.setItem("clerk_token", token);
+      localStorage.setItem("user_email", email);
+      
+      alert("✅ Signed up! Redirecting...");
+      location.reload();
+    }
+
+    function handleSignIn() {
+      const email = document.getElementById("email").value.trim();
+      const errorEl = document.getElementById("email-error");
+
+      if (!isValidEmail(email)) {
+        errorEl.style.display = "block";
+        return;
+      }
+
+      errorEl.style.display = "none";
+      const token = generateSimpleJWT(email);
+      localStorage.setItem("clerk_token", token);
+      localStorage.setItem("user_email", email);
+      
+      alert("✅ Signed in! Redirecting...");
+      location.reload();
+    }
 
     function handleLogout() {
-      Clerk.signOut(() => {
-        localStorage.removeItem("clerk_token");
-        window.location.href = "/login.html";
-      });
+      localStorage.removeItem("clerk_token");
+      localStorage.removeItem("user_email");
+      location.reload();
     }
 
     function goToApp() {
       window.location.href = "/index.html";
     }
+
+    // Check auth on page load
+    document.addEventListener("DOMContentLoaded", checkAuth);
+
+    // Allow Enter key to sign in
+    document.getElementById("email")?.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        handleSignIn();
+      }
+    });
   </script>
 </body>
 </html>
