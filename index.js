@@ -3,6 +3,11 @@ const fs = require("fs");
 const csv = require("csv-parser");
 const multer = require("multer");
 const qrcode = require("qrcode-terminal");
+// Clerk Setup
+const dotenv = require("dotenv");
+const { verifyToken } = require("@clerk/backend");
+dotenv.config();
+
 const SESSION_PATH = './sessions';
 const path = require("path");
 const {makeWASocket,
@@ -10,6 +15,7 @@ const {makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
 } = require("@whiskeysockets/baileys");
+
 
 const app = express();
 const PORT = process.env.PORT || 5500;
@@ -27,6 +33,25 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 app.use(express.static("public"));
 app.use(express.json());
 
+// ADD THIS MIDDLEWARE: for Clerk
+const authenticateUser = async (req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  
+  if (!token) {
+    return res.status(401).json({ error: "No token provided" });
+  }
+  
+  try {
+    const decoded = await verifyToken(token, {
+      secretKey: process.env.CLERK_SECRET_KEY,
+    });
+    req.user = decoded;
+    next();
+  } catch (err) {
+    console.error("❌ Token verification failed:", err.message);
+    res.status(401).json({ error: "Unauthorized" });
+  }
+};
 // Validate phone number: only digits, optionally starting with +
 function isValidPhoneNumber(number) {
   return /^\+?\d{7,15}$/.test(number);
@@ -117,7 +142,8 @@ app.get("/qr", (req, res) => {
   }
 });
 
-app.post("/check", async (req, res) => {
+// single check edited for clerk with authentication
+app.post("/check", authenticateUser, async (req, res) => {
   if (!sock || connectionStatus !== 'connected') {
     return res.status(503).json({ error: "WhatsApp is not connected yet" });
   }
@@ -139,7 +165,9 @@ app.post("/check", async (req, res) => {
   }
 });
 
-app.post("/upload", upload.single("file"), async (req, res) => {
+// upload check edited for clerk with authentication
+
+app.post("/upload", authenticateUser, upload.single("file"), async (req, res) => {
   if (!sock || connectionStatus !== 'connected') {
     return res.status(503).json({ error: "WhatsApp is not connected yet" });
   }
@@ -198,6 +226,14 @@ async function checkMany(numbers) {
   }
   return results;
 }
+// Dashboard fpor clerk before app.listen
+app.get("/user/dashboard", authenticateUser, async (req, res) => {
+  res.json({
+    userId: req.user.sub,
+    email: req.user.email_addresses?.[0]?.email_address || "N/A",
+    message: "Welcome! Auth is working.",
+  });
+});
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);

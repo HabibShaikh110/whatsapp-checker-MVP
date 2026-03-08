@@ -1,18 +1,22 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <link rel="shortcut icon" href="/images/5SSdze-LogoMakr.png" type="image/x-icon">
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <link
+      rel="shortcut icon"
+      href="/images/5SSdze-LogoMakr.png"
+      type="image/x-icon"
+    />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>WhatsValid | App</title>
     <style>
-       * {
+      * {
         box-sizing: border-box;
       }
 
       body {
         margin: 0;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
         background-color: #f4f4f4;
         display: flex;
         flex-direction: column;
@@ -45,7 +49,6 @@
         text-align: center;
         margin-bottom: 20px;
       }
-      
 
       #bulkForm {
         background: white;
@@ -60,7 +63,7 @@
         align-items: center;
       }
 
-      input[type='file'] {
+      input[type="file"] {
         margin-bottom: 20px;
         font-size: 14px;
       }
@@ -145,38 +148,38 @@
         width: 100%;
       }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="navbar">
-        <div class="logo">WhatsValid</div>
-          <a href="/index.html">Switch to Single Check</a>
-        <a href="https://wa.bnbcloudservices.com">← Back to Main Site</a>
+      <div class="logo">WhatsValid</div>
+      <a href="/index.html">Switch to Single Check</a>
+      <a href="https://wa.bnbcloudservices.com">← Back to Main Site</a>
     </div>
 
     <form id="bulkForm">
-        <h3>📂 Bulk Check (.txt or .csv)</h3>
-        <input type="file" id="fileInput" accept=".txt,.csv" />
-        <button type="submit">Upload</button>
-        <div id="checkingBulkStatus" style="display: none">
-          ⏳ Checking Numbers...
-        </div>
-        <div id="bulkResults"></div>
+      <h3>📂 Bulk Check (.txt or .csv)</h3>
+      <input type="file" id="fileInput" accept=".txt,.csv" />
+      <button type="submit">Upload</button>
+      <div id="checkingBulkStatus" style="display: none">
+        ⏳ Checking Numbers...
+      </div>
+      <div id="bulkResults"></div>
     </form>
 
     <!-- Result Table -->
     <div id="bulk-result-section" style="display: none; margin-top: 20px">
-        <h3>✅ Bulk Check Results:</h3>
-        <table border="1" id="result-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Phone Number</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-        <button onclick="downloadExcel()">⬇️ Download Excel</button>
+      <h3>✅ Bulk Check Results:</h3>
+      <table border="1" id="result-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Phone Number</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <button onclick="downloadExcel()">⬇️ Download Excel</button>
     </div>
 
     <div class="footer">
@@ -185,35 +188,48 @@
 
     <script>
       function escapeHtml(str) {
-        const div = document.createElement('div');
+        const div = document.createElement("div");
         div.textContent = str;
         return div.innerHTML;
       }
 
       document
-        .getElementById("bulkForm").addEventListener("submit", async function (e) {
-        e.preventDefault();
+        .getElementById("bulkForm")
+        .addEventListener("submit", async function (e) {
+          e.preventDefault();
           document.getElementById("checkingBulkStatus").style.display = "block";
           const fileInput = document.getElementById("fileInput");
           const file = fileInput.files[0];
           if (!file) {
-            document.getElementById("checkingBulkStatus").style.display = "none";
+            document.getElementById("checkingBulkStatus").style.display =
+              "none";
             return alert("Please select a file.");
           }
 
           const formData = new FormData();
           formData.append("file", file);
-
+          
+          // Clerk added
           try {
+            const token = localStorage.getItem("clerk_token");
+            if (!token) {
+              window.location.href = "/login.html";
+              return;
+            }
+
             const res = await fetch("/upload", {
               method: "POST",
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
               body: formData,
             });
 
             const data = await res.json();
 
             if (data.error) {
-              document.getElementById("checkingBulkStatus").style.display = "none";
+              document.getElementById("checkingBulkStatus").style.display =
+                "none";
               return alert(data.error);
             }
 
@@ -231,11 +247,12 @@
                 tdPhone.textContent = item.number;
 
                 const tdStatus = document.createElement("td");
-                tdStatus.textContent = item.exists === true
-                  ? "\u2705 Valid"
-                  : item.exists === false
-                  ? "\u274C Invalid"
-                  : "\u26A0\uFE0F Error";
+                tdStatus.textContent =
+                  item.exists === true
+                    ? "\u2705 Valid"
+                    : item.exists === false
+                      ? "\u274C Invalid"
+                      : "\u26A0\uFE0F Error";
 
                 row.appendChild(tdNum);
                 row.appendChild(tdPhone);
@@ -245,7 +262,8 @@
 
               // Save results for download
               window.bulkResults = data.results;
-              document.getElementById("bulk-result-section").style.display = "block";
+              document.getElementById("bulk-result-section").style.display =
+                "block";
             } else {
               alert("No results found.");
             }
@@ -270,8 +288,8 @@
             item.exists === true
               ? "Valid"
               : item.exists === false
-              ? "Invalid"
-              : "Error",
+                ? "Invalid"
+                : "Error",
           ]),
         ];
 
@@ -282,7 +300,7 @@
               row
                 .map(String)
                 .map((cell) => '"' + cell.replace(/"/g, '""') + '"')
-                .join(",")
+                .join(","),
             )
             .join("\r\n");
 
@@ -299,5 +317,5 @@
         document.body.removeChild(link);
       }
     </script>
-</body>
+  </body>
 </html>

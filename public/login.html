@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Checker - Login</title>
+  <!-- Clerk Script -->
+  <script
+    async
+    crossorigin="anonymous"
+    data-clerk-publishable-key=pk_test_YWJzb2x1dGUtcGVnYXN1cy0yOS5jbGVyay5hY2NvdW50cy5kZXYk
+    src="https://cdn.clerk.com/clerk.js"
+  ></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .container {
+      background: white;
+      padding: 40px;
+      border-radius: 10px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+      max-width: 400px;
+      width: 90%;
+      text-align: center;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+    p {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    .clerk-container {
+      margin: 20px 0;
+    }
+    .user-info {
+      display: none;
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #eee;
+    }
+    .user-info p {
+      text-align: left;
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+    .user-info .email {
+      background: #f5f5f5;
+      padding: 8px 12px;
+      border-radius: 4px;
+      word-break: break-all;
+      font-family: monospace;
+      margin-bottom: 15px;
+    }
+    .btn-primary {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 10px;
+      transition: all 0.3s ease;
+    }
+    .btn-primary:hover {
+      background: #764ba2;
+    }
+    .btn-logout {
+      background: #e74c3c;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 5px;
+      transition: all 0.3s ease;
+    }
+    .btn-logout:hover {
+      background: #c0392b;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>✓ WhatsApp Checker</h1>
+    <p>Sign in to check numbers</p>
+    
+    <div id="auth-section" class="clerk-container">
+      <!-- Clerk will render here -->
+    </div>
+
+    <div class="user-info" id="user-info">
+      <p><strong>✅ Logged in!</strong></p>
+      <p>Email:</p>
+      <div class="email" id="user-email">-</div>
+      <button class="btn-primary" onclick="goToApp()">Go to App</button>
+      <button class="btn-logout" onclick="handleLogout()">Logout</button>
+    </div>
+  </div>
+
+  <script>
+    // Wait for Clerk to load
+    window.addEventListener('load', async () => {
+      await Clerk.load();
+
+      const user = Clerk.user;
+
+      if (user) {
+        // User is logged in
+        document.getElementById("auth-section").style.display = "none";
+        document.getElementById("user-info").style.display = "block";
+        document.getElementById("user-email").textContent = user.primaryEmailAddress?.emailAddress || "User";
+
+        // Store token for API calls
+        const token = await user.getIdToken();
+        localStorage.setItem("clerk_token", token);
+      } else {
+        // User not logged in - show Clerk signin widget
+        document.getElementById("auth-section").style.display = "block";
+        document.getElementById("user-info").style.display = "none";
+
+        Clerk.mountSignIn(document.getElementById("auth-section"), {
+          appearance: {
+            elements: {
+              rootBox: "w-full",
+              card: "shadow-none border-0"
+            }
+          }
+        });
+      }
+    });
+
+    function handleLogout() {
+      Clerk.signOut(() => {
+        localStorage.removeItem("clerk_token");
+        window.location.href = "/login.html";
+      });
+    }
+
+    function goToApp() {
+      window.location.href = "/index.html";
+    }
+  </script>
+</body>
+</html>
